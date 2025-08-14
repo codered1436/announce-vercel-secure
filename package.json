@@ -1,0 +1,15 @@
+{
+  "name": "announce-vercel-functions",
+  "version": "1.0.0",
+  "description": "Serverless functions for the Announce app.",
+  "main": "api/send.js",
+  "scripts": {
+    "start": "node api/send.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.11.1",
+    "node-fetch": "^3.3.2"
+  },
+  "author": "",
+  "license": "ISC"
+}
