@@ -1,6 +1,6 @@
 /**
  * Vercel Serverless Function to send OneSignal notifications.
- * Uses CommonJS syntax (require) for compatibility.
+ * Reads user data from Firebase Realtime Database.
  */
 const admin = require('firebase-admin');
 const fetch = require('node-fetch');
@@ -9,14 +9,19 @@ const fetch = require('node-fetch');
 if (!admin.apps.length) {
   try {
     admin.initializeApp({
-      credential: admin.credential.cert(JSON.parse(process.env.SERVICE_ACCOUNT_JSON))
+      credential: admin.credential.cert(JSON.parse(process.env.SERVICE_ACCOUNT_JSON)),
+      // IMPORTANT: This must point to your Realtime Database
+      databaseURL: "https://announce-cad6a-default-rtdb.asia-southeast1.firebasedatabase.app"
     });
   } catch (err) {
     console.error("Firebase Admin initialization error:", err);
+    // If initialization fails, stop the function immediately
+    return;
   }
 }
 
-const db = admin.firestore();
+// Get a reference to the Realtime Database service
+const rtdb = admin.database();
 
 // --- Main Handler Function ---
 module.exports = async (req, res) => {
@@ -29,7 +34,7 @@ module.exports = async (req, res) => {
     return res.status(401).json({ error: "Unauthorized - Invalid API Key" });
   }
 
-  if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_REST_API_KEY) {
+  if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_REST_KEY) {
       console.error("OneSignal environment variables not set.");
       return res.status(500).json({ error: "OneSignal configuration missing on server." });
   }
@@ -50,16 +55,22 @@ module.exports = async (req, res) => {
     if (toAll) {
       payload.included_segments = ["All"];
     } else {
-      const usersSnapshot = await db.collection("users").where("playerId", "!=", null).get();
+      // Fetch users from Realtime Database
+      const usersRef = rtdb.ref("users");
+      const snapshot = await usersRef.once("value");
+      const users = snapshot.val();
+
       const playerIds = [];
-      usersSnapshot.forEach(doc => {
-        const data = doc.data();
-        if (data && data.playerId) {
-          playerIds.push(data.playerId);
+      if (users) {
+        for (const uid in users) {
+          if (users[uid] && users[uid].playerId) {
+            playerIds.push(users[uid].playerId);
+          }
         }
-      });
+      }
 
       if (playerIds.length === 0) {
+        console.log("No subscribed users with playerIds found in Realtime Database.");
         return res.status(200).json({ success: true, message: "No subscribed users found." });
       }
       payload.include_player_ids = playerIds;
@@ -69,7 +80,7 @@ module.exports = async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Basic ${process.env.ONESIGNAL_REST_API_KEY}`,
+        "Authorization": `Basic ${process.env.ONESIGNAL_REST_KEY}`,
       },
       body: JSON.stringify(payload),
     });
@@ -82,8 +93,9 @@ module.exports = async (req, res) => {
     }
 
     return res.status(200).json({ success: true, data });
+
   } catch (error) {
-    console.error("❌ Error:", error);
+    console.error("❌ Error processing request:", error);
     return res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 };
