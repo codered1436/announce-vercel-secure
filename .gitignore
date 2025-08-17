@@ -1,2 +1,12 @@
+# Environment variables
+.env.local
+
+# Dependencies
+/node_modules
+
+# Vercel
 .vercel
-node_modules
+
+# Build output
+.next/
+out/
