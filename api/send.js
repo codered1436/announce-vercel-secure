@@ -9,13 +9,15 @@ const fetch = require('node-fetch');
 if (!admin.apps.length) {
   try {
     admin.initializeApp({
-      credential: admin.credential.cert(JSON.parse(process.env.SERVICE_ACCOUNT_JSON)),
-      // IMPORTANT: This must point to your Realtime Database
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      }),
       databaseURL: "https://announce-cad6a-default-rtdb.asia-southeast1.firebasedatabase.app"
     });
   } catch (err) {
-    console.error("Firebase Admin initialization error:", err);
-    // If initialization fails, stop the function immediately
+    console.error("🔥 Firebase Admin initialization error:", err);
     return;
   }
 }
@@ -35,8 +37,8 @@ module.exports = async (req, res) => {
   }
 
   if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_REST_KEY) {
-      console.error("OneSignal environment variables not set.");
-      return res.status(500).json({ error: "OneSignal configuration missing on server." });
+    console.error("❌ OneSignal environment variables not set.");
+    return res.status(500).json({ error: "OneSignal configuration missing on server." });
   }
 
   try {
@@ -70,7 +72,7 @@ module.exports = async (req, res) => {
       }
 
       if (playerIds.length === 0) {
-        console.log("No subscribed users with playerIds found in Realtime Database.");
+        console.log("⚠️ No subscribed users with playerIds found in Realtime Database.");
         return res.status(200).json({ success: true, message: "No subscribed users found." });
       }
       payload.include_player_ids = playerIds;
